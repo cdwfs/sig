@@ -10,15 +10,23 @@
 /* gcc -lm sig.c; a.out > /dev/dsp */
 #include <math.h>
 #include <stdio.h>
-void main(void)
+int main(void)
 {
 	int v,i,z,n,u,t;
 	FILE *dsp = fopen("/dev/dsp", "wb");
+	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
 	for(v=-1;;)
 	{
-		for(n=pow(
-1.06,"`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^"[++v&31]+(v&64)/21),i=999;i;fputc(
-	128+((8191&u)>i?0:i/8)-((8191&(z+=n))*i-->>16),dsp))u+=v&1?t/2:(t=v&6?t:n/4);
+		i=999;
+		v += 1;
+		n=pow(1.06, str[v&31]+(v&64)/21);
+		for(;i;
+			fputc(128+((8191&u)>i?0:i/8)-((8191&(z+=n))*i >> 16), dsp), i-=1
+			)
+		{
+			u += v&1?t/2:(t=v&6?t:n/4);
+		}
 	}
 	fclose(dsp);
+	return 0;
 }
