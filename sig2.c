@@ -24,7 +24,7 @@ int main(void)
 	printf("\n");
 	return 0;
 #else
-	char str[] = {
+	char notes[] = {
 		 96, 99, 87, 96,103, 91, 96, 99,
 		103, 99,103, 91,101, 89, 99, 98,
 		 94, 98, 86, 94,101, 87, 94, 98,
@@ -34,14 +34,33 @@ int main(void)
 
 	for(v=-1;;)
 	{
-		i=999;
-		v += 1;
-		n=pow(1.06, str[v&31]+(v&64)/21);
-		for(;i;
-			fputc(128+((8191&u)>i?0:i/8)-((8191&(z+=n))*i >> 16), dsp), i-=1
+		/* This constant is the number of samples to generate for each
+		 * note in the sequence. Higher values -> slower tempo
+		 */
+		int samplesPerStep = 999;
+		/* Advance to the next note in the sequence. */
+		v += 1; 
+		char note = notes[v&31]; 
+		/* Every 3rd & 4th iteration through the sequence should be transposed
+		 * up three steps.
+		 */
+		if (v&64) 
+			note += 3;
+		/* 1.06 is (approximately) the ratio of the frequencies of
+		 * successive notes in a 12-tone Western scale. We know that
+		 * each octave doubles the frequency. The increase between
+		 * each pair of notes is thus the 12th root of 2.0, or
+		 * 1.059463039(...).  This factor is VERY finicky; a
+		 * relatively small change will significantly affect the
+		 * tonality of the result. Try changing to 1.059, 1.058, etc.
+		*/
+		double freqRatio = 1.06;
+		int freq = pow(freqRatio, note);
+		for(;samplesPerStep;
+			fputc(128+((8191&u)>samplesPerStep?0:samplesPerStep/8)-((8191&(z+=freq))*samplesPerStep >> 16), dsp), samplesPerStep-=1
 			)
 		{
-			u += v&1?t/2:(t=v&6?t:n/4);
+			u += v&1?t/2:(t=v&6?t:freq/4);
 		}
 	}
 	fclose(dsp);
