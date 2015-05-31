@@ -10,11 +10,28 @@
 /* gcc -lm sig.c; a.out > /dev/dsp */
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 int main(void)
 {
 	int v,i,z,n,u,t;
 	FILE *dsp = fopen("/dev/dsp", "wb");
+#if 0
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
+	for(i=0; i<strlen(str); ++i)
+	{
+		printf("%d,", str[i]);
+	}
+	printf("\n");
+	return 0;
+#else
+	char str[] = {
+		 96, 99, 87, 96,103, 91, 96, 99,
+		103, 99,103, 91,101, 89, 99, 98,
+		 94, 98, 86, 94,101, 87, 94, 98,
+	    101, 94, 98, 86,101, 99, 98, 94,
+	};
+#endif
+
 	for(v=-1;;)
 	{
 		i=999;
