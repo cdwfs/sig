@@ -54,8 +54,8 @@ int main(void)
 		 * relatively small change will significantly affect the
 		 * tonality of the result. Try changing to 1.059, 1.058, etc.
 		*/
-		double freqRatio = 1.06;
-		int freq = pow(freqRatio, note);
+		double stepFreqRatio = 1.06;
+		int freqRatio = pow(stepFreqRatio, note);
 		while(samplesPerStep != 0)
 		{
 			if (noteIndex & 1)
@@ -64,12 +64,12 @@ int main(void)
 			}
 			else
 			{
-				t = (noteIndex & 6) ? t : freq/4;
+				t = (noteIndex & 6) ? t : freqRatio/4;
 				u += t;
 			}
 			unsigned char byte = 128 + 
 				((8191&u)>samplesPerStep ? 0 : samplesPerStep/8) - 
-				((8191&(z+=freq))*samplesPerStep >> 16);
+				((8191&(z+=freqRatio))*samplesPerStep >> 16);
 			fputc(byte, dsp);
 			samplesPerStep-=1;
 		}
