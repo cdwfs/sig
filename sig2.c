@@ -13,7 +13,7 @@
 #include <string.h>
 int main(void)
 {
-	int v,i,z,n,u,t;
+	int z,u,t;
 	FILE *dsp = fopen("/dev/dsp", "wb");
 #if 0
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
@@ -31,20 +31,20 @@ int main(void)
 	    101, 94, 98, 86,101, 99, 98, 94,
 	};
 #endif
-
-	for(v=-1;;)
+	int noteIndex = -1;
+	for(;;)
 	{
 		/* This constant is the number of samples to generate for each
 		 * note in the sequence. Higher values -> slower tempo
 		 */
 		int samplesPerStep = 999;
 		/* Advance to the next note in the sequence. */
-		v += 1; 
-		char note = notes[v&31]; 
+		noteIndex += 1; 
+		char note = notes[noteIndex&31]; 
 		/* Every 3rd & 4th iteration through the sequence should be transposed
 		 * up three steps.
 		 */
-		if (v&64) 
+		if (noteIndex & 64) 
 			note += 3;
 		/* 1.06 is (approximately) the ratio of the frequencies of
 		 * successive notes in a 12-tone Western scale. We know that
@@ -56,11 +56,22 @@ int main(void)
 		*/
 		double freqRatio = 1.06;
 		int freq = pow(freqRatio, note);
-		for(;samplesPerStep;
-			fputc(128+((8191&u)>samplesPerStep?0:samplesPerStep/8)-((8191&(z+=freq))*samplesPerStep >> 16), dsp), samplesPerStep-=1
-			)
+		while(samplesPerStep != 0)
 		{
-			u += v&1?t/2:(t=v&6?t:freq/4);
+			if (noteIndex & 1)
+			{
+				u += t/2;
+			}
+			else
+			{
+				t = (noteIndex & 6) ? t : freq/4;
+				u += t;
+			}
+			unsigned char byte = 128 + 
+				((8191&u)>samplesPerStep ? 0 : samplesPerStep/8) - 
+				((8191&(z+=freq))*samplesPerStep >> 16);
+			fputc(byte, dsp);
+			samplesPerStep-=1;
 		}
 	}
 	fclose(dsp);
