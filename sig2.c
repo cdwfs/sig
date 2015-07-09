@@ -13,7 +13,7 @@
 #include <string.h>
 int main(void)
 {
-	int z,u,t;
+	int z=0,u=0,t=0;
 	FILE *dsp = fopen("/dev/dsp", "wb");
 #if 0
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
