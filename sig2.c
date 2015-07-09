@@ -16,7 +16,9 @@ int main(void)
 	int z=0,u=0,t=0;
 	FILE *dsp = fopen("/dev/dsp", "wb");
 #if 0
+	/* Original string as it appeared in viznut's code */
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
+	/* ...and the loop to generate the array below */
 	for(i=0; i<strlen(str); ++i)
 	{
 		printf("%d,", str[i]);
