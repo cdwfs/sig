@@ -57,7 +57,8 @@ int main(void)
 		 * relatively small change will significantly affect the
 		 * tonality of the result. Try changing to 1.059, 1.058, etc.
 		*/
-		double stepFreqRatio = 1.06;
+		double stepFreqRatio = 1.06; /* viznut's value, rounded to two places for brevity. */
+		// double stepFreqRatio = pow(2.0, 1.0/12.0); /* more precise value */
 		int freqRatio = pow(stepFreqRatio, note);
 		while(samplesPerStep != 0)
 		{
