@@ -42,7 +42,8 @@ int main(void)
 		int samplesPerStep = 999;
 		/* Advance to the next note in the sequence. */
 		noteIndex += 1; 
-		char note = notes[noteIndex&31]; 
+		int sequenceLength = sizeof(notes) / sizeof(notes[0]);
+		char note = notes[noteIndex % sequenceLength]; 
 		/* Every 3rd & 4th iteration through the sequence should be transposed
 		 * up three steps.
 		 */
