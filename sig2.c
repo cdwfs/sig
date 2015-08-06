@@ -16,9 +16,9 @@ int main(void)
 	int z=0,u=0,t=0;
 	FILE *dsp = fopen("/dev/dsp", "wb");
 #if 0
-	/* Original string as it appeared in viznut's code */
+	// Original string as it appeared in viznut's code
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
-	/* ...and the loop to generate the array below */
+	// ...and the loop to generate the array below
 	for(i=0; i<strlen(str); ++i)
 	{
 		printf("%d,", str[i]);
@@ -36,29 +36,26 @@ int main(void)
 	int noteIndex = -1;
 	for(;;)
 	{
-		/* This constant is the number of samples to generate for each
-		 * note in the sequence. Higher values -> slower tempo
-		 */
+		// This constant is the number of samples to generate for each
+		// note in the sequence. Higher values -> slower tempo
 		int samplesPerStep = 999;
-		/* Advance to the next note in the sequence. */
+		// Advance to the next note in the sequence.
 		noteIndex += 1; 
 		int sequenceLength = sizeof(notes) / sizeof(notes[0]);
 		char note = notes[noteIndex % sequenceLength]; 
-		/* Every 3rd & 4th iteration through the sequence should be transposed
-		 * up three steps.
-		 */
+		// Every 3rd & 4th iteration through the sequence should be transposed
+		// up three steps.
 		if (noteIndex & 64) 
 			note += 3;
-		/* 1.06 is (approximately) the ratio of the frequencies of
-		 * successive notes in a 12-tone Western scale. We know that
-		 * each octave doubles the frequency. The increase between
-		 * each pair of notes is thus the 12th root of 2.0, or
-		 * 1.059463039(...).  This factor is VERY finicky; a
-		 * relatively small change will significantly affect the
-		 * tonality of the result. Try changing to 1.059, 1.058, etc.
-		*/
-		double stepFreqRatio = 1.06; /* viznut's value, rounded to two places for brevity. */
-		// double stepFreqRatio = pow(2.0, 1.0/12.0); /* more precise value */
+		// 1.06 is (approximately) the ratio of the frequencies of
+		// successive notes in a 12-tone Western scale. We know that
+		// each octave doubles the frequency. The increase between
+		// each pair of notes is thus the 12th root of 2.0, or
+		// 1.059463039(...).  This factor is VERY finicky; a
+		// relatively small change will significantly affect the
+		// tonality of the result. Try changing to 1.059, 1.058, etc.
+		double stepFreqRatio = 1.06; // viznut's value, rounded to two places for brevity.
+		// double stepFreqRatio = pow(2.0, 1.0/12.0); // more precise value
 		int freqRatio = pow(stepFreqRatio, note);
 		while(samplesPerStep != 0)
 		{
