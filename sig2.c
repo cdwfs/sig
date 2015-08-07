@@ -10,11 +10,27 @@
 /* gcc -lm sig.c; a.out > /dev/dsp */
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
 int main(void)
 {
 	int z=0,u=0,t=0;
 	FILE *dsp = fopen("/dev/dsp", "wb");
+	
+	unsigned char *refSamples = NULL;
+	size_t refFileNbytes = 0;
+	FILE *refFile = fopen("reference.bin", "rb");
+	if (refFile != NULL)
+	{
+		fseek(refFile, 0, SEEK_END);
+		refFileNbytes = ftell(refFile);;
+		fseek(refFile, 0, SEEK_SET);
+		refSamples = malloc(refFileNbytes);
+		fread(refSamples, refFileNbytes, 1, refFile);
+		fclose(refFile);
+	}
+
 #if 0
 	// Original string as it appeared in viznut's code
 	const char *str = "`cW`g[`cgcg[eYcb^bV^eW^be^bVecb^";
@@ -71,6 +87,19 @@ int main(void)
 			unsigned char byte = 128 + 
 				((8191&u)>samplesPerStep ? 0 : samplesPerStep/8) - 
 				((8191&(z+=freqRatio))*samplesPerStep >> 16);
+			// Check against reference samples, if available
+			static int sampleIndex = 0;
+			if (refSamples &&
+				sampleIndex < refFileNbytes &&
+				byte != refSamples[sampleIndex])
+			{
+				fprintf(stderr, "ERROR: sample mismatch at index %d (generated 0x%02X, expected 0x%02X)\n",
+					sampleIndex, byte, refSamples[sampleIndex]);
+			}
+			sampleIndex += 1;
+			if (sampleIndex == refFileNbytes)
+				fprintf(stderr, "All samples matched reference values until now\n");
+			// Output
 			fputc(byte, dsp);
 			samplesPerStep-=1;
 		}
