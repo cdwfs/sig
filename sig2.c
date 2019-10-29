@@ -8,38 +8,102 @@
 
 /*** ---- viznut --- http://www.hytti.uku.fi/~vheikkil/ */
 /* gcc -lm sig.c; a.out > /dev/dsp */
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#define CDS_SYNC_IMPLEMENTATION
+#include "cds_sync.h"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-size_t OUTPUT_BUFFER_SIZE = 8000 * 60 * sizeof(uint8_t);
-uint8_t* outputBuffer = NULL;
+typedef struct sample_ring_buffer {
+  uint8_t* buffer;
+  size_t readIndex;
+  size_t writeIndex;
+  uint32_t bufferSize;
+  cds_sync_futex_t lock;
+} sample_ring_buffer;
+
+void sample_ring_buffer_init(sample_ring_buffer* ringBuffer, uint32_t bufferSize)
+{
+  assert(bufferSize > 0);
+  ringBuffer->bufferSize = bufferSize;
+  ringBuffer->buffer = (uint8_t*)malloc(bufferSize);
+  ringBuffer->readIndex = 0;
+  ringBuffer->writeIndex = 0;
+  cds_sync_futex_init(&(ringBuffer->lock));
+}
+void sample_ring_buffer_destroy(sample_ring_buffer* ringBuffer)
+{
+  free(ringBuffer->buffer);
+  ringBuffer->buffer = NULL;
+  ringBuffer->bufferSize = 0;
+  cds_sync_futex_destroy(&(ringBuffer->lock));
+}
+int sample_ringbuffer_is_full(sample_ring_buffer* ringBuffer)
+{
+  return ((ringBuffer->bufferSize + ringBuffer->writeIndex - ringBuffer->readIndex) % ringBuffer->bufferSize)
+    == (ringBuffer->bufferSize - 1);
+}
+
+size_t RING_BUFFER_SIZE = 8000 * 1 * sizeof(uint8_t);
 uint64_t sampleCount = 0;
 uint64_t playedSampleCount = 0;
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
-  (void)pDevice;
   (void)pInput;
 
   memset(pOutput, 0, frameCount * sizeof(uint8_t));
-  uint64_t numToCopy = sampleCount - playedSampleCount;
-  if (numToCopy > frameCount)
-    numToCopy = frameCount;
-  memcpy(pOutput, outputBuffer + playedSampleCount, numToCopy);
-  playedSampleCount += numToCopy;
-  if (playedSampleCount >= OUTPUT_BUFFER_SIZE)
-    exit(0);
+  sample_ring_buffer* ringBuffer = (sample_ring_buffer*)pDevice->pUserData;
+  assert(ringBuffer->readIndex < ringBuffer->bufferSize);
+  assert(ringBuffer->writeIndex < ringBuffer->bufferSize);
+  cds_sync_futex_lock(&(ringBuffer->lock));
+  const uint8_t* start1 = ringBuffer->buffer + ringBuffer->readIndex;
+  const uint8_t* start2 = ringBuffer->buffer;
+  ptrdiff_t size1 = 0;
+  ptrdiff_t size2 = 0;
+  if (ringBuffer->readIndex == ringBuffer->writeIndex) {
+    // read == write -> ring buffer is empty
+  } else if (ringBuffer->readIndex < ringBuffer->writeIndex) {
+    // read < write  -> (write-read) bytes available, contiguous
+    size1 = ringBuffer->writeIndex - ringBuffer->readIndex;
+  } else {
+    // read > write  -> (bufferSize+write - read) bytes available, in two chunks.
+    size1 = ringBuffer->bufferSize - ringBuffer->readIndex;
+    size2 = ringBuffer->writeIndex;
+  }
+  
+  if (frameCount < size1) {
+    size1 = frameCount;
+    size2 = 0;
+  } else if (frameCount < size1 + size2) {
+    size2 = frameCount - size1;
+  }
+
+  if (size1 > 0) {
+    memcpy(pOutput, start1, size1);
+    if (size2 > 0) {
+      memcpy((uint8_t*)pOutput + size1, start2, size2);
+    }
+  }
+
+  ringBuffer->readIndex = (ringBuffer->readIndex + size1 + size2) % ringBuffer->bufferSize;
+
+  cds_sync_futex_unlock(&(ringBuffer->lock));
 }
 
 int main()
 {
-    outputBuffer = (uint8_t*)malloc(OUTPUT_BUFFER_SIZE);
+    // Initialize output buffer
+    sample_ring_buffer ringBuffer;
+    sample_ring_buffer_init(&ringBuffer, RING_BUFFER_SIZE);
 
     int z=0,u=0,t=0;
 
@@ -50,16 +114,18 @@ int main()
     audioDeviceConfig.playback.channels = 1;
     audioDeviceConfig.sampleRate = 8000;
     audioDeviceConfig.dataCallback = data_callback;
-    audioDeviceConfig.pUserData = NULL;
+    audioDeviceConfig.pUserData = &ringBuffer;
 
     if (ma_device_init(NULL, &audioDeviceConfig, &audioDevice) != MA_SUCCESS) {
       printf("Failed to open playback device.\n");
+      sample_ring_buffer_destroy(&ringBuffer);
       return -3;
     }
 
     if (ma_device_start(&audioDevice) != MA_SUCCESS) {
       printf("Failed to start playback device.\n");
       ma_device_uninit(&audioDevice);
+      sample_ring_buffer_destroy(&ringBuffer);
       return -4;
     }
 
@@ -152,14 +218,21 @@ int main()
             if (sampleIndex == refFileNbytes)
                 fprintf(stderr, "All samples matched reference values until now\n");
             // Output
-            //fputc(byte, dsp);
-            if (sampleCount < OUTPUT_BUFFER_SIZE) {
-              outputBuffer[sampleCount++] = byte;
+            cds_sync_futex_lock(&ringBuffer.lock);
+            while (sample_ringbuffer_is_full(&ringBuffer))
+            {
+              cds_sync_futex_unlock(&ringBuffer.lock);
+              Sleep(1);
+              cds_sync_futex_lock(&ringBuffer.lock);
             }
+            ringBuffer.buffer[ringBuffer.writeIndex] = byte;
+            ringBuffer.writeIndex = (ringBuffer.writeIndex + 1) % ringBuffer.bufferSize;
+            cds_sync_futex_unlock(&ringBuffer.lock);
             samplesPerStep -= 1;
         }
     }
 
+    sample_ring_buffer_destroy(&ringBuffer);
     ma_device_uninit(&audioDevice);
 
     return 0;

@@ -20,5 +20,5 @@ add_executable(${exe_name} sig-ref.c)
 target_link_libraries(${exe_name} ${libs})
 
 set(exe_name sig2)
-add_executable(${exe_name} sig2.c miniaudio.h)
+add_executable(${exe_name} sig2.c miniaudio.h cds_sync.h)
 target_link_libraries(${exe_name} ${libs})
