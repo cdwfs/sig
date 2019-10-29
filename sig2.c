@@ -10,13 +10,58 @@
 /* gcc -lm sig.c; a.out > /dev/dsp */
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-int main(void)
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+
+size_t OUTPUT_BUFFER_SIZE = 8000 * 60 * sizeof(uint8_t);
+uint8_t* outputBuffer = NULL;
+uint64_t sampleCount = 0;
+uint64_t playedSampleCount = 0;
+
+void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
+  (void)pDevice;
+  (void)pInput;
+
+  memset(pOutput, 0, frameCount * sizeof(uint8_t));
+  uint64_t numToCopy = sampleCount - playedSampleCount;
+  if (numToCopy > frameCount)
+    numToCopy = frameCount;
+  memcpy(pOutput, outputBuffer + playedSampleCount, numToCopy);
+  playedSampleCount += numToCopy;
+  if (playedSampleCount >= OUTPUT_BUFFER_SIZE)
+    exit(0);
+}
+
+int main()
+{
+    outputBuffer = (uint8_t*)malloc(OUTPUT_BUFFER_SIZE);
+
     int z=0,u=0,t=0;
-    FILE *dsp = fopen("/dev/dsp", "wb");
+
+    ma_device audioDevice;
+    ma_device_config audioDeviceConfig = ma_device_config_init(ma_device_type_playback);
+
+    audioDeviceConfig.playback.format = ma_format_u8;
+    audioDeviceConfig.playback.channels = 1;
+    audioDeviceConfig.sampleRate = 8000;
+    audioDeviceConfig.dataCallback = data_callback;
+    audioDeviceConfig.pUserData = NULL;
+
+    if (ma_device_init(NULL, &audioDeviceConfig, &audioDevice) != MA_SUCCESS) {
+      printf("Failed to open playback device.\n");
+      return -3;
+    }
+
+    if (ma_device_start(&audioDevice) != MA_SUCCESS) {
+      printf("Failed to start playback device.\n");
+      ma_device_uninit(&audioDevice);
+      return -4;
+    }
 
     unsigned char *refSamples = NULL;
     size_t refFileNbytes = 0;
@@ -49,6 +94,7 @@ int main(void)
         101, 94, 98, 86,101, 99, 98, 94,
     };
 #endif
+
     int noteIndex = -1;
     for(;;)
     {
@@ -90,9 +136,9 @@ int main(void)
                 u += t;
             }
             z += freqRatio;
-            unsigned char byte = 128 +
+            unsigned char byte = (unsigned char)(128 +
                 ((8191&u)>samplesPerStep ? 0 : samplesPerStep/8) -
-                ((8191&z)*samplesPerStep >> 16);
+                ((8191&z)*samplesPerStep >> 16));
             // Check against reference samples, if available
             static int sampleIndex = 0;
             if (refSamples &&
@@ -106,10 +152,15 @@ int main(void)
             if (sampleIndex == refFileNbytes)
                 fprintf(stderr, "All samples matched reference values until now\n");
             // Output
-            fputc(byte, dsp);
-            samplesPerStep-=1;
+            //fputc(byte, dsp);
+            if (sampleCount < OUTPUT_BUFFER_SIZE) {
+              outputBuffer[sampleCount++] = byte;
+            }
+            samplesPerStep -= 1;
         }
     }
-    fclose(dsp);
+
+    ma_device_uninit(&audioDevice);
+
     return 0;
 }
